@@ -127,7 +127,7 @@ class DBManager : SQLiteOpenHelper  {
             INSERT INTO $WORD_TABLE
             ($WORD_COL_TERM, $WORD_COL_CLASS, $WORD_COL_GLOSS,
              $WORD_COL_POS, $WORD_COL_EXAMPLE, $WORD_COL_NOTES, $WORD_COL_LANGUAGE)
-            VALUES("${t.word}", ${t.myclass}, "${t.gloss}",
+            VALUES("${t.word.toLowerCase()}", ${t.myclass}, "${t.gloss}",
             "${t.pos}", "${t.examples}", "${t.notes}", "${t.language}");
             """
         writableDatabase.execSQL(query)
@@ -143,11 +143,12 @@ class DBManager : SQLiteOpenHelper  {
         } else {
             Log.d("DBmanager", "Running UPDATE for term with id = ${t.id}")
             var query = """UPDATE $WORD_TABLE
-            SET $WORD_COL_TERM = "${t.word}", $WORD_COL_CLASS = ${t.myclass},
+            SET $WORD_COL_TERM = "${t.word.toLowerCase()}", $WORD_COL_CLASS = ${t.myclass},
             $WORD_COL_GLOSS = "${t.gloss}", $WORD_COL_POS = "${t.pos}", $WORD_COL_EXAMPLE = "${t.examples}",
             $WORD_COL_NOTES = "${t.notes}", $WORD_COL_LANGUAGE = "${t.language}"
             WHERE $WORD_COL_TERM_ID = ${t.id};"""
             writableDatabase.execSQL(query)
+            /*
             //TODO remove this
             var x = getWordById(t.id)
 
@@ -156,6 +157,7 @@ class DBManager : SQLiteOpenHelper  {
             } else {
                 Log.d("DBmanager", "word not found after update")
             }
+            */
         }
     }
 }
