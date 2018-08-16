@@ -33,7 +33,7 @@ function updateTermClass(term, newclass, oldclass) {
 
     private fun wrapWord( x :String, myclass : Int, id : Int, lang : String) : String {
         //  onclick="nukeClick();"
-        return "<span class=\"${x.toLowerCase()} ${getCssClass(myclass)}\" onmouseup=\"wordClicked('$x', $id, '$lang');\"  onmousedown=\"startMyTimer('$x', $id, '$lang');\" >$x</span>"
+        return "<span class=\"${x.toLowerCase()} ${getCssClass(myclass)}\" onmouseup=\"wordClicked('$x', $id, '$lang');\"  ontouchstart=\"startMyTimer('$x', $id, '$lang');\" >$x</span>"
     }
 
     var css = """
@@ -41,9 +41,9 @@ function updateTermClass(term, newclass, oldclass) {
          .one { background-color: orange; }
          .two { background-color: yellow; }
          .three { background-color: blue; }
-         .four { background-color: lightblue;}
-         .five { background-color: green;}
-         .ignore { background-color: indigo; color: white;}
+         .four { background-color: lightblue; }
+         .five { background-color: lightgreen; }
+         .ignore { color: darkslategray; }
          </style>
     """
 
@@ -64,29 +64,6 @@ function updateTermClass(term, newclass, oldclass) {
         return out
     }
 
-    fun updateTermInHtml(html :String, w : String, wclass :Int, wid :Int, lang :String) : String {
-        val h = Jsoup.parse(html)
-
-        val matches = h.select("span[data-id=$wid]")
-
-        for (m in matches) {
-            m.removeAttr("class")
-            m.addClass(getCssClass(wclass))
-        }
-        return h.outerHtml()
-        //return html.replace("\\b$w\\b".toRegex(), wrapWord(w, wclass, wid, lang))
-    }
-
-    /*
-        private fun getClass(word :String, lang : String, db : DBManager) : Int {
-            //TODO figure out DB stuff
-            val words = db.getWords(lang, word)
-            if (words != null){
-                return words[0].myclass
-            }
-            return 0
-        }
-    */
     fun getCssClass(x : Int) : String {
         return when (x) {
             0 -> "unknown"
