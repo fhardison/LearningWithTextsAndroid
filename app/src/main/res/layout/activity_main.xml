@@ -11,7 +11,7 @@
         android:id="@+id/showtext"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Show Text"
+        android:text="Show Texts"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toLeftOf="parent"
         app:layout_constraintRight_toLeftOf="@id/showterms"
@@ -20,12 +20,20 @@
         android:id="@+id/showterms"
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
-        android:text="Show Terms"
+        android:text="Add Text"
         app:layout_constraintBottom_toBottomOf="parent"
         app:layout_constraintLeft_toRightOf="@id/showtext"
         app:layout_constraintRight_toRightOf="parent"
         app:layout_constraintTop_toTopOf="parent"/>
-
+    <Button
+        android:id="@+id/showlangs"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:text="View Languages"
+        app:layout_constraintBottom_toBottomOf="parent"
+        app:layout_constraintLeft_toLeftOf="parent"
+        app:layout_constraintRight_toRightOf="parent"
+        app:layout_constraintTop_toBottomOf="@id/showtext"/>
 
 
 </android.support.constraint.ConstraintLayout>

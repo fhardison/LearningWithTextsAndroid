@@ -3,6 +3,7 @@ import android.annotation.SuppressLint
 import android.app.FragmentManager
 import android.content.Context
 import android.content.res.Resources
+import android.net.Uri
 import android.os.Bundle
 import android.support.v7.app.AppCompatActivity
 import android.webkit.ValueCallback
@@ -52,21 +53,10 @@ class ViewText : AppCompatActivity() {
                 Toast.makeText(myctx, "$x not found in term list", Toast.LENGTH_SHORT).show()
             } else {
                 val db = DBManager.getInstance(myctx)
-                val match = db.getWordById(id)
-                if (match != null) {
-                    Toast.makeText(myctx, "${match.word} = ${match.gloss}", Toast.LENGTH_SHORT).show()
-                } else {
-                    Toast.makeText(myctx, "$x not found in term list", Toast.LENGTH_SHORT).show()
-                }
+                val message = db.getWordById(id).fold({"$x not found in term list"},{ "${it.word} = ${it.gloss}"})
+                Toast.makeText(myctx, message, Toast.LENGTH_SHORT).show()
             }
         }
-
-        /*
-        @android.webkit.JavascriptInterface
-        fun showDialog(x :String, id: Int, lang :String) {
-            val dialog = TermEdit.newInstance(lang, id, x)
-            dialog.show(fragMan, "term_edit")
-        } */
     }
 
 
@@ -74,42 +64,54 @@ class ViewText : AppCompatActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContentView(R.layout.activity_view_text)
+        val args = intent.extras
+
+        if (args != null) {
+            val fpath = args.getString("FPATH")
 
 
-        val wv = this.findViewById<WebView>(R.id.textwebview)
-        // disable long press so that the javascript will work.
+            val wv = this.findViewById<WebView>(R.id.textwebview)
+            // disable long press so that the javascript will work.
 
-        wv.settings.javaScriptEnabled = true
+            wv.settings.javaScriptEnabled = true
 
-        val fragManager = this.fragmentManager
-        val jsi = JavascriptInterface(this, fragManager)
+            val fragManager = this.fragmentManager
+            val jsi = JavascriptInterface(this, fragManager)
 
-        wv.addJavascriptInterface(jsi, "interface")
-        wv.isLongClickable = true
-        wv.isClickable = true
-        val test = "<html>" + TextProcessor.jscode + TextProcessor.css + "<body><h1>Hi</h1><b>Click me</b></body></html>"
-        val update = {term: String, id: Int, cl: Int, l: String, oldcl :Int -> updateHtml(wv, term,id, cl, l, oldcl); -1}
+            wv.addJavascriptInterface(jsi, "interface")
+            wv.isLongClickable = true
+            wv.isClickable = true
 
-        wv.setOnLongClickListener {
-            val dialog = TermEdit.newInstance(jsi.lang, jsi.myid, jsi.word, update)
-            dialog.show(fragManager, "my dialog")
-            true
+            val update = { term: String, id: Int, cl: Int, l: String, oldcl: Int -> updateHtml(wv, term, id, cl, l, oldcl); -1 }
+
+            wv.setOnLongClickListener {
+                val dialog = TermEdit.newInstance(jsi.lang, jsi.myid, jsi.word, update)
+                dialog.show(fragManager, "my dialog")
+                true
+            }
+            wv.setOnClickListener {
+                jsi.showWord(jsi.word, jsi.myid, jsi.lang)
+                //true
+            }
+
+            //val test = "<html>" + TextProcessor.jscode + TextProcessor.css + "<body><h1>Hi</h1><b>Click me</b></body></html>"
+
+            wv.loadData(TextProcessor.toHtml(getText(fpath), "Nederlands", this), "text/html", null)
         }
-        wv.setOnClickListener {
-            jsi.showWord(jsi.word, jsi.myid, jsi.lang)
-            //true
-        }
-
-        wv.loadData(TextProcessor.toHtml(test, "Nederlands", this), "text/html", null)
-
     }
 
 
-    fun updateHtml(wv: WebView, term: String, id: Int, myclass: Int, lang: String, oldcl :Int) {
+    private fun updateHtml(wv: WebView, term: String, id: Int, myclass: Int, lang: String, oldcl :Int) {
 
         val cmd = "javascript:updateTermClass('${term.toLowerCase()}', '${TextProcessor.getCssClass(myclass)}', '${TextProcessor.getCssClass(oldcl)}');"
         wv.evaluateJavascript(cmd, null)
     }
 
+    private fun getText(path :String) : String {
+        val uri = Uri.parse(path)
+        //return contentResolver.openInputStream(uri).bufferedReader().use {it.readText()}
+        return File(path).bufferedReader().use { it.readText() }
+
+    }
 }
 

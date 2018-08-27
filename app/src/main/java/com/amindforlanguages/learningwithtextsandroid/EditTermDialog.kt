@@ -10,6 +10,7 @@ import android.view.View
 import android.widget.EditText
 import android.widget.RadioButton
 import android.widget.Toast
+import arrow.core.Some
 
 class TermEdit : DialogFragment() {
     companion object {
@@ -48,10 +49,7 @@ class TermEdit : DialogFragment() {
 
         val builder = AlertDialog.Builder(activity)
         val inflater = activity.layoutInflater
-
-
         builder.setTitle("Term")
-
         val content = inflater.inflate(R.layout.edit_term_view, null)
 
         val term = content.findViewById<EditText>(R.id.edit_term_term)
@@ -60,8 +58,9 @@ class TermEdit : DialogFragment() {
         if (myid!! > -1) {
             val db = DBManager.getInstance(activity)
             Log.d("DBmanager", "Dialog fetching term with id of ${myid!!}")
-            val match = db.getWordById(myid!!)
-            if (match != null) {
+            val m = db.getWordById(myid!!)
+            if (m is Some) {
+                val match = m.t
                 val gl = content.findViewById<EditText>(R.id.edit_term_gloss)
                 val exe = content.findViewById<EditText>(R.id.edit_term_exe)
                 val notes = content.findViewById<EditText>(R.id.edit_term_notes)

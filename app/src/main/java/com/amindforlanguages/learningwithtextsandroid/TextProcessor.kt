@@ -1,6 +1,7 @@
 package com.amindforlanguages.learningwithtextsandroid
 
 import android.content.Context
+import arrow.core.*
 import org.jsoup.Jsoup
 
 
@@ -46,23 +47,36 @@ function updateTermClass(term, newclass, oldclass) {
          .ignore { color: darkslategray; }
          </style>
     """
+    val reg = "[.,/#!\$%^&*;:{}=\\-_`~()\\[\\]]".toRegex()
+
+    inline fun removePunct(word :String) : String  = word.replace(reg, "")
 
     fun toHtml(x : String, lang : String,  ctx : Context) : String {
+
         val db = DBManager.getInstance(ctx)
         var out = x
+        out = out.replace("<body>", "$jscode\n$css\n<body>")
         val words = getAllTextNodes(Jsoup.parse(x).body())
-        for ( w in words) {
-            val matches = db.getWords(lang, w.toLowerCase())
+        for (w in words) {
+            val matches = db.getWordsForHtml(lang, w.toLowerCase())
             var wclass = 0
             var wid = -1
-            if (matches != null) {
-                wclass = matches[0].myclass
-                wid = matches[0].id
+            when (matches) {
+                is Some -> {
+                    val m = matches.t[0]
+                    wclass = m.myclass
+                    wid = m.id
+                }
             }
-            out = out.replace("\\b$w\\b".toRegex(), wrapWord(w, wclass, wid, lang))
+
+            val nukeit = removePunct(w)
+            if (nukeit != "") {
+                out = out.replace("\\b$nukeit\\b".toRegex(), wrapWord(w, wclass, wid, lang))
+            }
         }
         return out
     }
+//TODO add thing to split long texts into shorter files
 
     fun getCssClass(x : Int) : String {
         return when (x) {
@@ -78,20 +92,20 @@ function updateTermClass(term, newclass, oldclass) {
         }
     }
 
-    private fun getAllTextNodes(node : org.jsoup.nodes.Node) : MutableList<String> {
-        val out = mutableListOf<String>()
+    private fun getAllTextNodes(node : org.jsoup.nodes.Node) : MutableSet<String> {
+        val out = mutableSetOf<String>()
         for (n : org.jsoup.nodes.Node in node.childNodes()) {
             if (n is org.jsoup.nodes.TextNode && !(n.text().isBlank())) {
-                val y = n.text().trim().split(" ")
-                if (y.count() > 1) {
-                    out.addAll(y)
-                } else {
-                    out.add(y[0])
+                val y = n.text().trim().split(" ").filter { !(it.trim() == "") }
+                when {
+                    y.count() > 1 -> out.addAll(y)
+                    y.count() < 1 -> return out
+                    else -> out.add(y[0])
                 }
             } else {
                 out.addAll(getAllTextNodes(n))
             }
         }
-        return out.toSet().toMutableList()
+        return out
     }
 }

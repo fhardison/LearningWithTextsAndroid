@@ -1,3 +1,4 @@
 <resources>
     <string name="app_name">Learning With Texts Android</string>
+    <string name="title_activity_add_text">AddText</string>
 </resources>

@@ -3,9 +3,11 @@ package com.amindforlanguages.learningwithtextsandroid
 
 import android.content.Context
 import android.database.Cursor
-import android.database.sqlite.*
+import android.database.sqlite.SQLiteDatabase
+import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
-import android.widget.Toast
+import arrow.*
+import arrow.core.*
 
 
 class DBManager : SQLiteOpenHelper  {
@@ -53,7 +55,7 @@ class DBManager : SQLiteOpenHelper  {
     //val db : SQLiteDatabase = SQLiteDatabase.openOrCreateDatabase(dbname, null)
 
     override fun onCreate(db: SQLiteDatabase?) {
-        db?.execSQL("CREATE TABLE IF NOT EXISTS $LANGUAGES_TABLE($LANGUAGE_COL_ID VARCHAR, $LANGUAGE_COL_NAME INTEGER PRIMARY KEY AUTOINCREMENT);")
+        db?.execSQL("CREATE TABLE IF NOT EXISTS $LANGUAGES_TABLE($LANGUAGE_COL_NAME VARCHAR PRIMARY KEY);")
         db?.execSQL("CREATE TABLE IF NOT EXISTS $TEXT_TABLE($TEXT_COL_ID INTEGER PRIMARY KEY AUTOINCREMENT,$TEXT_COL_FILE_PATH VARCHAR, $TEXT_COL_LANGUAGE VARCHAR, $TEXT_COL_NAME VARCHAR, $TEXT_COL_WORD_COUNT INTEGER);")
         db?.execSQL("CREATE TABLE IF NOT EXISTS $WORD_TABLE($WORD_COL_TERM_ID INTEGER PRIMARY KEY AUTOINCREMENT, $WORD_COL_TERM VARCHAR, $WORD_COL_CLASS INTEGER, $WORD_COL_GLOSS VARCHAR, $WORD_COL_POS VARCHAR, $WORD_COL_EXAMPLE VARCHAR, $WORD_COL_NOTES VARCHAR, $WORD_COL_LANGUAGE VARCHAR);")
     }
@@ -62,29 +64,95 @@ class DBManager : SQLiteOpenHelper  {
         db?.execSQL("DROP TABLE IF EXISTS $LANGUAGES_TABLE;")
         db?.execSQL("DROP TABLE IF EXISTS $TEXT_TABLE;")
         db?.execSQL("DROP TABLE IF EXISTS $WORD_TABLE;")
+        onCreate(db)
     }
 
-    fun getWordById(id : Int) : Term? {
+    fun saveText(textName : String, filePath : String, langId : String) {
+        val query = """INSERT OR IGNORE INTO $TEXT_TABLE
+            ($TEXT_COL_NAME, $TEXT_COL_FILE_PATH, $TEXT_COL_LANGUAGE, $TEXT_COL_WORD_COUNT)
+            VALUES("$textName", "$filePath", "$langId", 0);
+        """
+        writableDatabase.execSQL(query)
+    }
+
+    fun getTexts(lang : String) : Option<List<Text>> {
+        val query  = """SELECT * FROM $TEXT_TABLE WHERE $TEXT_COL_LANGUAGE="$lang""""
+        val resSet = readableDatabase.rawQuery(query, null)
+        val out = mutableListOf<Text>()
+
+        if (resSet.count < 1) return None
+
+        with(resSet) {
+            while (moveToNext()) {
+                val name = getString(getColumnIndexOrThrow(TEXT_COL_NAME))
+                val language = getString(getColumnIndexOrThrow(TEXT_COL_LANGUAGE))
+                val path = getString(getColumnIndexOrThrow(TEXT_COL_FILE_PATH))
+                val wc = getInt(getColumnIndexOrThrow(TEXT_COL_WORD_COUNT))
+                val id = getInt(getColumnIndexOrThrow(TEXT_COL_ID))
+                out.add(Text(id, name, path, language, wc))
+            }
+        }
+
+        return Some(out.toList())
+    }
+
+    fun insertLanguage(langName: String) {
+        val query = "INSERT OR IGNORE INTO $LANGUAGES_TABLE ($LANGUAGE_COL_NAME) VALUES (\"$langName\");"
+        writableDatabase.execSQL(query)
+    }
+
+    fun getLanguages() : Option<List<Language>> {
+        val query = "SELECT * FROM $LANGUAGES_TABLE;"
+        val resSet: Cursor = readableDatabase.rawQuery(query, null)
+        val out = mutableListOf<Language>()
+
+        if (resSet.count < 1) return None
+
+        with(resSet) {
+            while (moveToNext()) {
+                val name = getString(getColumnIndexOrThrow(LANGUAGE_COL_NAME))
+                out.add(Language(name))
+            }
+        }
+
+        resSet.close()
+
+        return Some(out.toList())
+    }
+
+    fun getWordById(id : Int) : Option<Term> {
         val resSet : Cursor = readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_TERM_ID = $id;", null)
         return if (resSet.count > 0) {
-            parseWordsRes(resSet)[0]
+            Some(parseWordsRes(resSet)[0])
         } else {
             Log.d("DBmanager", "nothing found for id = $id")
             resSet.close()
-            null
+            None
         }
     }
-    fun getWords(lang : String, term : String) : List<Term>? {
-        val resSet :Cursor = readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_LANGUAGE='$lang' AND $WORD_COL_TERM='$term';", null)
+
+    fun getWords(lang : String, term : String) : Option<List<Term>> {
+        val resSet :Cursor = readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_LANGUAGE=\"$lang\" AND $WORD_COL_TERM=\"$term\";", null)
         return if (resSet.count > 0){
             Log.d("DBManager", "records found")
-            parseWordsRes(resSet)
+            Some(parseWordsRes(resSet))
         } else {
             Log.d("DBManager", "no records found")
             resSet.close()
-            null
+            None
         }
+    }
 
+    fun getWordsForHtml(lang : String, term : String) : Option<List<Term>> {
+        val resSet :Cursor = readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_LANGUAGE=\"$lang\" AND $WORD_COL_TERM=\"$term\";", null)
+        return if (resSet.count > 0){
+            Log.d("DBManager", "records found")
+            Some(parseWordsResForHtml(resSet))
+        } else {
+            Log.d("DBManager", "no records found")
+            resSet.close()
+            None
+        }
     }
 
     private fun parseWordsRes(resSet :Cursor) : List<Term> {
@@ -101,6 +169,20 @@ class DBManager : SQLiteOpenHelper  {
                 val pos = getString(getColumnIndexOrThrow(WORD_COL_POS))
                 val lang = getString(getColumnIndexOrThrow(WORD_COL_LANGUAGE))
                 out.add(Term(id, term, myclass, gl, pos, exs, notes, lang))
+            }
+        }
+        resSet.close()
+        return out
+    }
+
+    private fun parseWordsResForHtml(resSet :Cursor) : List<Term> {
+        val out = mutableListOf<Term>()
+
+        with (resSet){
+            while (moveToNext()) {
+                val id = getInt(getColumnIndexOrThrow(WORD_COL_TERM_ID))
+                val myclass = getInt(getColumnIndexOrThrow(WORD_COL_CLASS))
+                out.add(Term(id, "", myclass, "", "", "", "", ""))
             }
         }
         resSet.close()
@@ -148,30 +230,28 @@ class DBManager : SQLiteOpenHelper  {
             $WORD_COL_NOTES = "${t.notes}", $WORD_COL_LANGUAGE = "${t.language}"
             WHERE $WORD_COL_TERM_ID = ${t.id};"""
             writableDatabase.execSQL(query)
-            /*
-            //TODO remove this
-            var x = getWordById(t.id)
-
-            if (x != null) {
-                Log.d("DBmanager", "UPDATE done, term now has class of ${x.myclass}")
-            } else {
-                Log.d("DBmanager", "word not found after update")
-            }
-            */
         }
+    }
+
+    fun addLanguage(text: String) {
+        val query ="INSERT INTO $LANGUAGES_TABLE ($LANGUAGE_COL_NAME) VALUES(\"$text\")"
+
+        writableDatabase.execSQL(query)
+    }
+
+    fun removeText(id: Int) {
+        val query = "DELETE FROM $TEXT_TABLE WHERE $TEXT_COL_ID=$id"
+        writableDatabase.execSQL(query)
     }
 }
 
 
 
 
-class Term(myid :Int, w : String, cl : Int, gl :String, mypos :String, exs :String, ns :String, lang : String) {
-    val id = myid
-    val word = w
-    val myclass = cl
-    val gloss = gl
-    val pos = mypos
-    val examples = exs
-    val notes = ns
-    val language = lang
-}
+class Term(val id :Int, val word : String,val myclass : Int,
+           val gloss :String, val pos :String, val examples :String,
+           val notes :String, val language : String)
+
+class Language(val name : String)
+
+class Text (val id : Int, val name : String,val path : String, val lang : String, val wordCount : Int)
