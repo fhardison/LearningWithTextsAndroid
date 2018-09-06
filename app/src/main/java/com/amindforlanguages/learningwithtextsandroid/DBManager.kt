@@ -8,6 +8,7 @@ import android.database.sqlite.SQLiteOpenHelper
 import android.util.Log
 import arrow.*
 import arrow.core.*
+import org.jsoup.nodes.TextNode
 
 
 class DBManager : SQLiteOpenHelper  {
@@ -67,12 +68,19 @@ class DBManager : SQLiteOpenHelper  {
         onCreate(db)
     }
 
-    fun saveText(textName : String, filePath : String, langId : String) {
-        val query = """INSERT OR IGNORE INTO $TEXT_TABLE
+    fun saveText(textName : String, filePaths : List<String>, langId : String) {
+        val fpCount = filePaths.count() > 1
+
+
+        for( i in filePaths.indices) {
+            val filePath = filePaths[i].replace("%20", " ")
+            val tn = if (fpCount) "$textName ${i + 1}" else textName
+            val query = """INSERT OR IGNORE INTO $TEXT_TABLE
             ($TEXT_COL_NAME, $TEXT_COL_FILE_PATH, $TEXT_COL_LANGUAGE, $TEXT_COL_WORD_COUNT)
-            VALUES("$textName", "$filePath", "$langId", 0);
+            VALUES("$tn", "$filePath", "$langId", 0);
         """
-        writableDatabase.execSQL(query)
+            writableDatabase.execSQL(query)
+        }
     }
 
     fun getTexts(lang : String) : Option<List<Text>> {
@@ -143,8 +151,7 @@ class DBManager : SQLiteOpenHelper  {
         }
     }
 
-    fun getWordsForHtml(lang : String, term : String) : Option<List<Term>> {
-        val resSet :Cursor = readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_LANGUAGE=\"$lang\" AND $WORD_COL_TERM=\"$term\";", null)
+    fun handleResSetForHtml(resSet: Cursor) : Option<List<Term>> {
         return if (resSet.count > 0){
             Log.d("DBManager", "records found")
             Some(parseWordsResForHtml(resSet))
@@ -153,6 +160,11 @@ class DBManager : SQLiteOpenHelper  {
             resSet.close()
             None
         }
+    }
+
+    fun getWordsForHtml(lang : String, term : String) : Option<List<Term>> {
+        val resSet  = Try {readableDatabase.rawQuery("SELECT * from $WORD_TABLE WHERE $WORD_COL_LANGUAGE=\"$lang\" AND $WORD_COL_TERM=\"$term\";", null) }
+        return resSet.fold({ None }, {handleResSetForHtml(it)})
     }
 
     private fun parseWordsRes(resSet :Cursor) : List<Term> {

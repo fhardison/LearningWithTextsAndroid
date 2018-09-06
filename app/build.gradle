@@ -6,6 +6,7 @@ apply plugin: 'kotlin-android-extensions'
 
 apply plugin: 'kotlin-kapt'
 
+
 android {
     compileSdkVersion 26
     defaultConfig {
@@ -37,6 +38,8 @@ dependencies {
     androidTestImplementation 'com.android.support.test.espresso:espresso-core:3.0.2'
 
     implementation 'org.jsoup:jsoup:1.11.3'
+    implementation "org.jetbrains.kotlinx:kotlinx-coroutines-android:0.25.3"
+    implementation 'org.jetbrains.kotlinx:kotlinx-coroutines-core:0.25.3'
 
     implementation "io.arrow-kt:arrow-core:$arrow_version"
     implementation "io.arrow-kt:arrow-syntax:$arrow_version"
@@ -47,7 +50,7 @@ dependencies {
     kapt    "io.arrow-kt:arrow-annotations-processor:$arrow_version"
     //implementation files('libs/remark-1.0.0-SNAPSHOT-standalone.jar')
     implementation 'com.overzealous:remark:1.0.0'
-
+    implementation "org.jetbrains:markdown:0.1.31"
     /*   implementation "io.arrow-kt:arrow-free:$arrow_version" //optional
        implementation "io.arrow-kt:arrow-mtl:$arrow_version" //optional
        implementation "io.arrow-kt:arrow-effects:$arrow_version" //optional

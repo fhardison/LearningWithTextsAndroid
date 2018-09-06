@@ -3,7 +3,12 @@ package com.amindforlanguages.learningwithtextsandroid
 import android.content.Context
 import arrow.core.*
 import org.jsoup.Jsoup
+import org.intellij.markdown.*
+import org.intellij.markdown.flavours.commonmark.CommonMarkFlavourDescriptor
+import org.intellij.markdown.html.HtmlGenerator
+import org.intellij.markdown.parser.MarkdownParser
 
+typealias Markdown = String
 
 object TextProcessor {
 
@@ -48,9 +53,14 @@ function updateTermClass(term, newclass, oldclass) {
          </style>
     """
     val reg = "[.,/#!\$%^&*;:{}=\\-_`~()\\[\\]]".toRegex()
+    val reg2 = "[.,/#!\$%^&*;:{}=\\-_`~()\\[\\]><]".toRegex()
 
-    inline fun removePunct(word :String) : String  = word.replace(reg, "")
+    fun removePunct(word :String) : String  = word.replace(reg, "")
 
+    fun replacePunctinMD(str : String, rep : String) = str.replace(reg2, rep)
+
+    //TODO add convertor to html
+    //TODO remove jsoup stuff
     fun toHtml(x : String, lang : String,  ctx : Context) : String {
 
         val db = DBManager.getInstance(ctx)
@@ -75,6 +85,49 @@ function updateTermClass(term, newclass, oldclass) {
             }
         }
         return out
+    }
+
+    fun stripHtmlTags(md : Markdown) : String = Jsoup.parse(md).text()
+
+    fun getWordsFromMd(md : Markdown) : List<String>  =  replacePunctinMD(stripHtmlTags(md), " ").split("\\b".toRegex()).toSet().filter { !it.trim().isNullOrBlank() }
+
+    fun getMdWords(md : Markdown) : List<String> = replacePunctinMD(md, " ").split("\\b".toRegex()).filter { !it.trim().isNullOrBlank() }
+
+    fun countMdWords (md: Markdown) : Int = getMdWords(md).count()
+
+    //fun nukeMDCodes(md : Markdown) : String = md.replace("[#*]".toRegex(), "")
+
+    fun convertMdToHtml(md : Markdown) : String {
+        val flavor = CommonMarkFlavourDescriptor()
+        val parsedTree = MarkdownParser(flavor).buildMarkdownTreeFromString(md)
+        return HtmlGenerator(md, parsedTree, flavor).generateHtml()
+    }
+
+    fun toHtmlFromMD(x : String, lang : String,  ctx : Context) : String {
+        val db = DBManager.getInstance(ctx)
+        var out = convertMdToHtml(x)
+        val words = getWordsFromMd(x)
+
+        for (w in words) {
+            val matches = db.getWordsForHtml(lang, w.toLowerCase())
+            var wclass = 0
+            var wid = -1
+            when (matches) {
+                is Some -> {
+                    val m = matches.t[0]
+                    wclass = m.myclass
+                    wid = m.id
+                }
+            }
+
+            val nukeit = removePunct(w)
+            if (nukeit != "") {
+                out = out.replace("\\b$nukeit\\b".toRegex(), wrapWord(w, wclass, wid, lang))
+            }
+        }
+
+        return out.replace("<body>", "$jscode\n$css\n<body>")
+
     }
 //TODO add thing to split long texts into shorter files
 

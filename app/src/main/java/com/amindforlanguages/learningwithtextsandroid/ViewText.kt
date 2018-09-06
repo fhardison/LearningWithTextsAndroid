@@ -96,7 +96,7 @@ class ViewText : AppCompatActivity() {
 
             //val test = "<html>" + TextProcessor.jscode + TextProcessor.css + "<body><h1>Hi</h1><b>Click me</b></body></html>"
 
-            wv.loadData(TextProcessor.toHtml(getText(fpath), "Nederlands", this), "text/html", null)
+            wv.loadData(TextProcessor.toHtmlFromMD(getText(fpath), "Nederlands", this), "text/html", null)
         }
     }
 
@@ -109,8 +109,8 @@ class ViewText : AppCompatActivity() {
 
     private fun getText(path :String) : String {
         val uri = Uri.parse(path)
-        //return contentResolver.openInputStream(uri).bufferedReader().use {it.readText()}
-        return File(path).bufferedReader().use { it.readText() }
+        return contentResolver.openInputStream(uri).bufferedReader().use {it.readText()}
+        //return File(uri.toString()).bufferedReader().use { it.readText() }
 
     }
 }

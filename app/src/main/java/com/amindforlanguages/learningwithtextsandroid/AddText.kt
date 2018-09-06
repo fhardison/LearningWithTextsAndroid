@@ -39,7 +39,10 @@ class AddText : AppCompatActivity() {
             //Toast.makeText(this, "No permission to write sotrage", Toast.LENGTH_SHORT).show()
             ActivityCompat.requestPermissions(this,arrayOf(android.Manifest.permission.WRITE_EXTERNAL_STORAGE), 123)
         }
-
+        if (ContextCompat.checkSelfPermission(this, android.Manifest.permission.READ_EXTERNAL_STORAGE) != PackageManager.PERMISSION_GRANTED){
+            //Toast.makeText(this, "No permission to write sotrage", Toast.LENGTH_SHORT).show()
+            ActivityCompat.requestPermissions(this,arrayOf(android.Manifest.permission.READ_EXTERNAL_STORAGE), 124)
+        }
 
         val intent = Intent()
         intent.type = "text/html"
@@ -57,10 +60,28 @@ class AddText : AppCompatActivity() {
         val cancelBtn = findViewById<Button>(R.id.pick_text_cancel)
         cancelBtn.setOnClickListener { _ -> this.finish() }
 
+        val enterTB = findViewById<EditText>(R.id.insert_text_content_box)
+
+
         val saveBtn = findViewById<Button>(R.id.pick_text_ok)
-        saveBtn.setOnClickListener { _ -> saveText(this.applicationContext,textTitle.text.toString(), filePath.toString(), langId ) }
+        saveBtn.setOnClickListener { _ ->
+            if (!enterTB.text.toString().isNullOrBlank()){
+                saveTextFromString(this.applicationContext,cleanName(textTitle.text.toString().trim()), enterTB.text.toString(), langId )
+            }
+            else {
+            saveText(this.applicationContext,textTitle.text.toString().trim(), filePath.toString(), langId )} }
 
 
+    }
+    val cleanName = {x : String -> x.replace("%20", " ")}
+    private fun saveTextFromString (ctx : Context, textName : String, content :String, langId :String ) {
+
+        val db = DBManager.getInstance(ctx)
+        val message = makeNewFile(textName).map { it.bufferedWriter().use { it.write(content)  }; it.toURI().toString() }
+                .map {db.saveText(textName, listOf(it), langId)}
+                .fold({"Text not saved"}, {"Text Saved"})
+        Toast.makeText(ctx, message, Toast.LENGTH_SHORT).show()
+        this.finish()
     }
 
     private fun saveText(ctx : Context, textName : String, fpath :String, langId :String ) {
@@ -74,18 +95,41 @@ class AddText : AppCompatActivity() {
         this.finish()
     }
 
+    private fun splitToFiles(md : String) : List<String> {
+        val words = TextProcessor.getMdWords(md)
+        return words.chunked(500).map { it.joinToString(" ")}
+    }
 
-    private fun convertToMarkdownAndGetPath(fpath :String) :Option<String> {
+    private fun saveFile(content : String, fpath: String, part : Int) : String {
+       return getFile(fpath, part).map {
+            it.printWriter().use { out -> out.print(content) };
+           it
+        }.fold({""}, { return if (it.toURI() != null) it.toString() else "" })
+    }
+
+    private fun convertToMarkdownAndGetPath(fpath :String) : Option<List<String>> {
         val remark = Remark()
         val content= Try { contentResolver.openInputStream(Uri.parse(fpath)).bufferedReader().use {it.readText()}}.toEither()
                 .flatMap { Right(remark.convert(it)) }
 
         return when (content) {
             is Either.Right -> {
-                getFile(fpath).map {
-                    it.printWriter().use { out -> out.print(content.b) }
-                    return if (it.toURI() != null) Some(it.toString()) else None
+                val wordCount = TextProcessor.countMdWords(content.b)
+
+                if (wordCount > 500) {
+                    val chunks = splitToFiles(content.b)
+                    var chunkNumber = 0
+
+                    val fNames = chunks.map {
+                        chunkNumber += 1;
+                        saveFile(it, fpath, chunkNumber)}.filter { !it.isNullOrEmpty() }
+
+                    return Some(fNames)
+                } else {
+                    return Some(listOf(saveFile(content.b, fpath, 1)))
                 }
+
+
             }
             is Either.Left -> None
         }
@@ -99,7 +143,6 @@ class AddText : AppCompatActivity() {
         }
 
         if (dirExists) {
-
             return Uri.parse(fpath)
                     .getRealPath(contentResolver)
                     .map{ it.replace(".html", ".md")}
@@ -108,6 +151,35 @@ class AddText : AppCompatActivity() {
         return None //Left(FileNotFoundException("Could not create output for $fpath"))
     }
 
+    private fun makeNewFile(textName : String) : Option<File> {
+        val sdMain = File(Environment.getExternalStorageDirectory().toString() + "/Download")
+        var dirExists = true
+        if (!sdMain.exists()){
+            dirExists = sdMain.mkdirs()
+        }
+        return if (dirExists) {
+            val f = File(sdMain, "${textName.trim()}.md")
+//            val takeFlags = Intent.FLAG_GRANT_READ_URI_PERMISSION
+//            contentResolver.takePersistableUriPermission(Uri.parse(f.toURI().toString()), takeFlags)
+           Some(f)
+        } else { None }
+    }
+
+    private fun getFile(fpath : String, part : Int) : Option< File> {
+        val sdMain = File(Environment.getExternalStorageDirectory().toString() + "/Download")
+        var dirExists = true
+        if (!sdMain.exists()){
+            dirExists = sdMain.mkdirs()
+        }
+
+        if (dirExists) {
+            return Uri.parse(fpath)
+                    .getRealPath(contentResolver)
+                    .map{ it.replace(".html", "_$part.md")}
+                    .map { File(sdMain, it) }
+        }
+        return None //Left(FileNotFoundException("Could not create output for $fpath"))
+    }
     fun pickLanguage() {
 
         val dialog = LanguageDialog()
